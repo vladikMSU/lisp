@@ -22,8 +22,8 @@
     (setf (get name prop) val )
 )
 
-(defun fatalError (msg_to_log)
-  (print (concatenate 'string "FATAL ERROR: " msg_to_log))
+(defun fatalError (msg)
+  (print (concatenate 'string "FATAL ERROR: " msg))
 )
 
 ; some other useful functions
@@ -102,20 +102,21 @@
 (defun sMatchRefalTemplate (refal_var template lst) 
   (let ((refal_var_value (get (car refal_var) (cadr refal_var))))
       (cond
+        ; if lst is empty or its first element is not atom - matching fails
         ((or (null lst) (not (atom (car lst)))) nil)
 
-        ; if refal_var_value exists then:
-        ; -- if previous s's value equals to lst's first element
-        ;    continue matching with lst's tail
-        ; -- return nil else
+        ; if variable of this type with such name has been assigned then:
+        ; -- if its value equals to lst's first element
+        ;    continue matching
+        ; -- else matching fails. return nil
         (refal_var_value
          (cond ((ne refal_var_value (car lst)) nil)
                ((Match template (cdr lst)))
          )
         )
 
-        ; refal_var_value doesn't exist here and lst's first element is atom, 
-        ; remember it's value and continue
+        ; this variable hasn't been assigned, 
+        ; assign it's value, continue matching and remove value if matching fails
         ((assignMatchRemove refal_var template lst))
       )
   )
@@ -124,8 +125,11 @@
 (defun wMatchRefalTemplate (refal_var template lst)
   (let ((refal_var_value (get (car refal_var) (cadr refal_var))))
       (cond
+        ; if lst is empty - matching fails
+        ((null lst) nil)
+
         ; if variable of this type with such name has been assigned then:
-        ; -- if this variable's value equals to lst's first element 
+        ; -- if its value equals to lst's first element 
         ;    continue matching
         ; -- else matching fails. return nil
         (refal_var_value
@@ -134,8 +138,8 @@
          )
         )
 
-        ; refal_var_value doesn't exist here
-        ; remember it's value and continue
+        ; this variable hasn't been assigned
+        ; assign it's value, continue matching and remove value if matching fails
         ((assignMatchRemove refal_var template lst))
       )
   )
@@ -147,19 +151,17 @@
   )
 )
 
-(defun elementNumberPrediction (n refal_var template lst)
+(defun predictElementsNumber (n refal_var template lst)
   (let ((first_n_elems (takeFirstNElements n lst)))
-    (cond
-      ((not (= n (smartLen first_n_elems))) nil)
-      ((get (car refal_var) (cadr refal_var))
-       (or (Match template (dropFirstNElements n lst))
-           (elementNumberPrediction (+ n 1) refal_var template lst)))
-      ((or 
-         (and (assignRefalVar refal_var first_n_elems) nil)
-         (Match template (dropFirstNElements n lst))
-         (and (remprop (car refal_var) (cadr refal_var)) nil)
-         (elementNumberPrediction (+ n 1) refal_var template lst)
-      ))
+    (cond ((not (= n (smartLen first_n_elems))) nil)
+
+          ; see if matching succeeds after assigning 
+          ; first n elements to current variable
+          ; if it doesn't, try with n+1 
+          ((or (and (assignRefalVar refal_var first_n_elems) nil)
+               (Match template (dropFirstNElements n lst))
+               (and (remprop (car refal_var) (cadr refal_var)) nil)
+               (predictElementsNumber (+ n 1) refal_var template lst)))
     )
   )
 )
@@ -168,7 +170,8 @@
   (let ((refal_var_value (get (car refal_var) (cadr refal_var))))
     (cond
       ; if such variable has already been assigned:
-      ; -- if 
+      ; -- if there are enough elements left in lst
+      ;    compare them with variable value and continue matching
       ; -- else matching fails. return nil
       (refal_var_value
        (let ((value_len       (smartLen refal_var_value))
@@ -179,8 +182,10 @@
           )
        )
       )
-      ; else
-      ((elementNumberPrediction n refal_var template lst))
+
+      ; such variable met for the first time
+      ; predict its value
+      ((predictElementsNumber n refal_var template lst))
     )
   )
 )
