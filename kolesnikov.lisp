@@ -16,32 +16,17 @@
 ; Тестирование производится отдельной программой.
 
 
-; input/output/assign functions
+; assign/debug functions
 
 (defun setPropFor (name prop val)
     (setf (get name prop) val )
 )
 
-(defun toString (item)
-  (princ-to-string item) 
+(defun fatalError (msg_to_log)
+  (print (concatenate 'string "FATAL ERROR: " msg_to_log))
 )
 
-(defun concatAll_ (lst) 
-  (cond
-    ((null lst) "")
-    ((atom (car lst)) 
-     (concatenate 'string (toString (car lst)) " " (concatAll_ (cdr lst))))
-    ((concatenate 'string "(" (concatAll_ (car lst)) ") " (concatAll_ (cdr lst))))
-  )
-)
-
-(defun concatAll (&rest lst)
-  (concatAll_ lst)
-)
-
-
-
-; some useful functions
+; some other useful functions
 
 (defun smartEq (lst1 lst2)
   (cond
@@ -91,8 +76,6 @@
   )
 )
 
-; functions for matching refal templates
-
 (defun isRefalVariable (lst)
   (cond
     ((atom lst) nil)
@@ -106,19 +89,12 @@
   )
 )
 
-(defun assignMatchRemove (refal_var template lst)
-  #|
-  (and
-    (print refal_var) 
-    (setPropFor (car refal_var) (cadr refal_var) (car lst))
-    (_Match template (cdr lst))
-    (remprop (car refal_var) (cadr refal_var))
-  )|#
+; functions for matching refal templates
 
-  
+(defun assignMatchRemove (refal_var template lst) 
   (or
     (and (setPropFor (car refal_var) (cadr refal_var) (car lst)) nil)
-    (_Match template (cdr lst))
+    (Match template (cdr lst))
     (and (remprop (car refal_var) (cadr refal_var)) nil)
   )
 )
@@ -134,7 +110,7 @@
         ; -- return nil else
         (refal_var_value
          (cond ((ne refal_var_value (car lst)) nil)
-               ((_Match template (cdr lst)))
+               ((Match template (cdr lst)))
          )
         )
 
@@ -154,7 +130,7 @@
         ; -- return nil else
         (refal_var_value
          (cond ((smartNe refal_var_value (car lst)) nil)
-               ((_Match template (cdr lst)))
+               ((Match template (cdr lst)))
          )
         )
 
@@ -176,11 +152,11 @@
     (cond
       ((not (= n (smartLen firstNElems))) nil)
       ((get (car refal_var) (cadr refal_var))
-       (or (_Match template (takeLstTail n lst))
+       (or (Match template (takeLstTail n lst))
            (elementNumberPrediction (+ n 1) refal_var template lst))) 
       ((or 
          (and (assignRefalVar refal_var firstNElems) nil)
-         (_Match template (takeLstTail n lst))
+         (Match template (takeLstTail n lst))
          (and (remprop (car refal_var) (cadr refal_var)) nil)
          (elementNumberPrediction (+ n 1) refal_var template lst)
       ))
@@ -196,7 +172,7 @@
        (let ((list_len (smartLen refal_var_value)) (firstListLenElems (takeFirstNElements (smartLen refal_var_value) lst)))
          (cond
            ((not (= list_len (smartLen firstListLenElems))) nil)
-           ((smartEq refal_var_value firstListLenElems) (_Match template (takeLstTail (smartLen firstListLenElems) lst)))
+           ((smartEq refal_var_value firstListLenElems) (Match template (takeLstTail (smartLen firstListLenElems) lst)))
          )
        )
       )
@@ -228,62 +204,9 @@
   )
 )
 
-
-(defun printValsOfType (var_type props_list)
-  (cond ((null props_list))
-        ((and (print (concatAll var_type (car props_list) " => " (cadr props_list)))
-              (printValsOfType var_type (cddr props_list))
-        ))
-  )
-)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun printVals () 
-  (and (printValsOfType 's (SYMBOL-PLIST 's))
-       (printValsOfType 'w (SYMBOL-PLIST 'w))
-       (printValsOfType 'e (SYMBOL-PLIST 'e))
-       (printValsOfType 'v (SYMBOL-PLIST 'v))
-  )
-)
-
-(defun fatalError (msg_to_log)
-  (print (concatenate 'string "FATAL ERROR: " msg_to_log))
-)
-
-; functions for preparational works
-
-(defun _cleanVar (var_type props_list)
-  (cond
-    ((null props_list))
-    ((remprop var_type (car props_list)) (_cleanVar var_type (cddr props_list)))
-    ((fatalError "cleanVar"))
-  )
-)
-
-(defun cleanVar (var_type) 
-  (_cleanVar var_type (SYMBOL-PLIST var_type))
-)
-
-(defun cleanVars ()
-  (and
-    (cleanVar 's) 
-    (cleanVar 'v) 
-    (cleanVar 'w) 
-    (cleanVar 'e)
-  )
-)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; main function calls
+; main function
 
 (defun Match (template lst)
-  (and
-    (cleanVars)
-    (print (concatenate 'string "RESULT: " (toString (_Match template lst))) )
-    (printVals)
-    (cleanVars)
-  )
-)
-
-(defun _Match (template lst)
   (cond
     ; template and lst are empty. end of parsing
     ((and (null template) (null lst)) T)
@@ -300,7 +223,7 @@
     ; first elements are equal atoms. recursive continue
     ((and (atom (car template)) 
           (eq (car template) (car lst))) 
-     (_Match (cdr template) (cdr lst)))
+     (Match (cdr template) (cdr lst)))
 
     ; process refal variables
     ((isRefalVariable (car template)) (matchRefalTemplate template lst))
@@ -313,7 +236,7 @@
         
     ; template's and list's first elements are lists.
     ; recursive continue
-    ((and (_Match (car template) (car lst))
-          (_Match (cdr template) (cdr lst))))
+    ((and (Match (car template) (car lst))
+          (Match (cdr template) (cdr lst))))
   )
 )
