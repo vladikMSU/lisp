@@ -28,6 +28,10 @@
 
 ; some other useful functions
 
+(defun ne (x y) 
+  (not (eq x y))
+)
+
 (defun smartEq (lst1 lst2)
   (cond
     ((or (and (eq lst1 '\nil) (null lst2)) 
@@ -42,10 +46,6 @@
 
 (defun smartNe (lst1 lst2)
   (not (smartEq lst1 lst2))
-)
-
-(defun ne (x y) 
-  (not (eq x y))
 )
 
 (defun smartLen (lst)
@@ -68,11 +68,11 @@
   )
 )
 
-(defun takeLstTail (n lst)
+(defun dropFirstNElements (n lst)
   (cond 
     ((null lst) nil)
     ((= n 0) lst)
-    ((takeLstTail (- n 1) (cdr lst)))
+    ((dropFirstNElements (- n 1) (cdr lst)))
   )
 )
 
@@ -124,10 +124,10 @@
 (defun wMatchRefalTemplate (refal_var template lst)
   (let ((refal_var_value (get (car refal_var) (cadr refal_var))))
       (cond
-        ; if refal_var_value exists then:
-        ; -- if previous w's value equals to lst's first element 
-        ;    continue matching with lst's tail
-        ; -- return nil else
+        ; if variable of this type with such name has been assigned then:
+        ; -- if this variable's value equals to lst's first element 
+        ;    continue matching
+        ; -- else matching fails. return nil
         (refal_var_value
          (cond ((smartNe refal_var_value (car lst)) nil)
                ((Match template (cdr lst)))
@@ -148,15 +148,15 @@
 )
 
 (defun elementNumberPrediction (n refal_var template lst)
-  (let ((firstNElems (takeFirstNElements n lst)))
+  (let ((first_n_elems (takeFirstNElements n lst)))
     (cond
-      ((not (= n (smartLen firstNElems))) nil)
+      ((not (= n (smartLen first_n_elems))) nil)
       ((get (car refal_var) (cadr refal_var))
-       (or (Match template (takeLstTail n lst))
-           (elementNumberPrediction (+ n 1) refal_var template lst))) 
+       (or (Match template (dropFirstNElements n lst))
+           (elementNumberPrediction (+ n 1) refal_var template lst)))
       ((or 
-         (and (assignRefalVar refal_var firstNElems) nil)
-         (Match template (takeLstTail n lst))
+         (and (assignRefalVar refal_var first_n_elems) nil)
+         (Match template (dropFirstNElements n lst))
          (and (remprop (car refal_var) (cadr refal_var)) nil)
          (elementNumberPrediction (+ n 1) refal_var template lst)
       ))
@@ -167,15 +167,19 @@
 (defun evMatchRefalTemplate (n refal_var template lst) 
   (let ((refal_var_value (get (car refal_var) (cadr refal_var))))
     (cond
-      ; if refal_var_value exists
+      ; if such variable has already been assigned:
+      ; -- if 
+      ; -- else matching fails. return nil
       (refal_var_value
-       (let ((list_len (smartLen refal_var_value)) (firstListLenElems (takeFirstNElements (smartLen refal_var_value) lst)))
-         (cond
-           ((not (= list_len (smartLen firstListLenElems))) nil)
-           ((smartEq refal_var_value firstListLenElems) (Match template (takeLstTail (smartLen firstListLenElems) lst)))
-         )
+       (let ((value_len       (smartLen refal_var_value))
+             (first_LEN_elems (takeFirstNElements (smartLen refal_var_value) lst)))
+          (cond ((not (= value_len (smartLen first_LEN_elems))) nil)
+                ((smartEq refal_var_value first_LEN_elems)
+                 (Match template (dropFirstNElements (smartLen first_LEN_elems) lst)))
+          )
        )
       )
+      ; else
       ((elementNumberPrediction n refal_var template lst))
     )
   )
@@ -191,15 +195,10 @@
 
 (defun matchRefalTemplate (template lst)
   (cond
-    ((or (null template)
-         (atom (car template))
-         (ne (smartLen (car template)) 2)))
-
     ((eq (car (car template)) 's) (sMatchRefalTemplate (car template) (cdr template) lst))
     ((eq (car (car template)) 'w) (wMatchRefalTemplate (car template) (cdr template) lst))
     ((eq (car (car template)) 'e) (eMatchRefalTemplate (car template) (cdr template) lst))
     ((eq (car (car template)) 'v) (vMatchRefalTemplate (car template) (cdr template) lst))
-
     ((fatalError "matchRefalTemplate"))
   )
 )
@@ -225,7 +224,7 @@
           (eq (car template) (car lst))) 
      (Match (cdr template) (cdr lst)))
 
-    ; process refal variables
+    ; match refal variables and the rest of template
     ((isRefalVariable (car template)) (matchRefalTemplate template lst))
 
     ; first element of template is list and
